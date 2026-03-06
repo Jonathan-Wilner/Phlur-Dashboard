@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar
+  ResponsiveContainer, PieChart, Pie, Cell
 } from "recharts";
 
 // ── Real data from Kapoq + Skai ─────────────────────────────────────────────
@@ -76,53 +76,47 @@ const SKAI_QUERIES = [
   { query: "perfumes for women",  spend: 2245,  sales: 4359,  conversions: 117,  acos: 51.49 },
 ];
 
-// ── GOALS — update these when you upload a new Excel file ───────────────────
+// ── GOALS ────────────────────────────────────────────────────────────────────
 const MONTHLY_GOALS = [
   { month: "Jan 2026", totalSalesGoal: 1400000, adSalesGoal: 700000,  adSpendBudget: 280000, tacosGoal: 20.0, acosGoal: 35.0, ordersGoal: 18000 },
   { month: "Feb 2026", totalSalesGoal: 1500000, adSalesGoal: 750000,  adSpendBudget: 270000, tacosGoal: 20.0, acosGoal: 35.0, ordersGoal: 19000 },
   { month: "Mar 2026", totalSalesGoal: 1200000, adSalesGoal: 600000,  adSpendBudget: 200000, tacosGoal: 20.0, acosGoal: 35.0, ordersGoal: 15000 },
 ];
-
-const ANNUAL_GOALS = {
-  totalSales:  18600000,
-  adSales:     9300000,
-  adSpend:     3310000,
-  orders:      222000,
-  tacosGoal:   18.0,
-  acosGoal:    32.0,
-};
-
-// ── Today's actuals YTD (Jan + Feb + Mar MTD) ────────────────────────────────
-const YTD = {
-  totalSales: 1458492 + 1578301 + 275084,
-  adSales:    741860  + 796686  + 123999,
-  adSpend:    352850  + 268125  + 44062,
-  orders:     19059   + 20015   + 3121,
-  tacos:      16.02, // most recent month
-  acos:       35.53,
-};
-
-// Days: Jan(31) + Feb(28) + Mar 6 = 65 of 365
-const DAYS_ELAPSED = 65;
-const DAYS_IN_YEAR = 365;
+const ANNUAL_GOALS = { totalSales: 18600000, adSales: 9300000, adSpend: 3310000, orders: 222000, tacosGoal: 18.0, acosGoal: 32.0 };
+const YTD = { totalSales: 1458492+1578301+275084, adSales: 741860+796686+123999, adSpend: 352850+268125+44062, orders: 19059+20015+3121, tacos: 16.02, acos: 35.53 };
+const DAYS_ELAPSED = 65, DAYS_IN_YEAR = 365;
 const YEAR_PCT = (DAYS_ELAPSED / DAYS_IN_YEAR) * 100;
+const MAR_DAY = 6, MAR_DAYS = 31, MAR_PCT = (MAR_DAY / MAR_DAYS) * 100;
 
-// March MTD
-const MAR_DAY = 6;
-const MAR_DAYS = 31;
-const MAR_PCT = (MAR_DAY / MAR_DAYS) * 100;
-const MAR_ACTUALS = MONTHLY[2];
-const MAR_GOALS   = MONTHLY_GOALS[2];
-
-// ── Design tokens ────────────────────────────────────────────────────────────
+// ── Market Defense Brand Colors ───────────────────────────────────────────────
 const C = {
-  bg: "#07090F", surface: "#0E1420", surface2: "#131A28",
-  border: "#1C2840", text: "#E8EDF5", muted: "#5A6A85",
-  cyan: "#00C2FF", amber: "#F59E0B", green: "#10B981",
-  red: "#F43F5E", violet: "#8B5CF6", orange: "#FB923C",
-  gold: "#F59E0B",
+  // Backgrounds — warm cream palette from marketdefense.com
+  bg:       "#F5F3F1",   // site background: rgb(245,243,241)
+  surface:  "#FFFFFF",   // card surface: white
+  surface2: "#EDEBE8",   // slightly darker cream for depth
+  // Borders & dividers
+  border:   "#E0DDD9",
+  border2:  "#D0CCC7",
+  // Text
+  text:     "#191919",   // near-black: rgb(25,25,25)
+  textSub:  "#3F3F3F",   // dark gray: rgb(63,63,63)
+  muted:    "#818181",   // secondary: rgb(129,129,129)
+  // Brand gold — from the MD shield logo
+  gold:     "#C9A84C",
+  goldLight:"#E8D9A8",
+  goldDark: "#9E7E2E",
+  // Semantic colors — desaturated to match luxury feel
+  green:    "#4A7C59",   // muted forest green
+  red:      "#9B3A3A",   // muted terracotta red
+  amber:    "#C9813A",   // warm amber
+  // Chart palette — warm, editorial tones
+  brown:    "#8B6A4F",
+  taupe:    "#9E9080",
+  charcoal: "#3D3935",
 };
-const PIE_COLORS = [C.cyan, C.amber, C.violet];
+
+const CHART_COLORS = [C.gold, C.charcoal, C.brown];
+const PIE_COLORS   = [C.charcoal, C.gold, C.brown];
 
 const fmt = {
   usd: v => v >= 1e6 ? `$${(v/1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v/1e3).toFixed(0)}k` : `$${v}`,
@@ -131,30 +125,33 @@ const fmt = {
   x:   v => `${Number(v).toFixed(2)}x`,
 };
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+// ── Tooltip ──────────────────────────────────────────────────────────────────
 const Tip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", fontSize: 12 }}>
-      <p style={{ color: C.text, fontWeight: 700, marginBottom: 6 }}>{label}</p>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 4, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.08)" }}>
+      <p style={{ color: C.text, fontWeight: 700, marginBottom: 6, fontFamily: "serif" }}>{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, margin: "2px 0" }}>
-          {p.name}: <span style={{ fontFamily: "monospace" }}>{typeof p.value === "number" && p.value > 500 ? fmt.usd(p.value) : p.value}</span>
+        <p key={i} style={{ color: p.color, margin: "2px 0", fontFamily: "monospace" }}>
+          {p.name}: {typeof p.value === "number" && p.value > 500 ? fmt.usd(p.value) : p.value}
         </p>
       ))}
     </div>
   );
 };
 
-function KPI({ label, value, sub, color = C.cyan, change, up }) {
+// ── KPI Card ─────────────────────────────────────────────────────────────────
+function KPI({ label, value, sub, change, up, accent = C.gold }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", flex: "1 1 150px", minWidth: 140, position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: color }} />
-      <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
-      <div style={{ color: C.text, fontSize: 22, fontWeight: 800, fontFamily: "monospace", lineHeight: 1.1 }}>{value}</div>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, padding: "18px 20px", flex: "1 1 150px", minWidth: 140, position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent }} />
+      <div style={{ color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>{label}</div>
+      <div style={{ color: C.text, fontSize: 22, fontWeight: 700, fontFamily: "monospace", lineHeight: 1.1 }}>{value}</div>
       {(sub || change) && (
         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
-          {change && <span style={{ background: up ? "rgba(16,185,129,.15)" : "rgba(244,63,94,.15)", color: up ? C.green : C.red, fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5 }}>{change}</span>}
+          {change && (
+            <span style={{ background: up ? "rgba(74,124,89,.12)" : "rgba(155,58,58,.12)", color: up ? C.green : C.red, fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 2 }}>{change}</span>
+          )}
           {sub && <span style={{ color: C.muted, fontSize: 11 }}>{sub}</span>}
         </div>
       )}
@@ -162,38 +159,37 @@ function KPI({ label, value, sub, color = C.cyan, change, up }) {
   );
 }
 
-function PacingBar({ label, actual, goal, expectedPct, color, format = "usd", inverse = false }) {
-  const actualPct = Math.min((actual / goal) * 100, 100);
-  const isOnPace  = inverse ? actualPct <= expectedPct : actualPct >= expectedPct;
-  const status    = isOnPace ? "On Pace ✓" : inverse ? "Over Pace ⚠" : "Behind ⚠";
-  const statusCol = isOnPace ? C.green : C.amber;
+// ── Pacing Bar ───────────────────────────────────────────────────────────────
+function PacingBar({ label, actual, goal, expectedPct, color = C.gold, format = "usd", inverse = false }) {
+  const actualPct  = Math.min((actual / goal) * 100, 100);
+  const isOnPace   = inverse ? actualPct <= expectedPct : actualPct >= expectedPct;
+  const statusCol  = isOnPace ? C.green : C.amber;
+  const statusText = isOnPace ? "On Pace ✓" : inverse ? "Over Pace ⚠" : "Behind ⚠";
   const displayActual = format === "usd" ? fmt.usd(actual) : fmt.pct(actual);
   const displayGoal   = format === "usd" ? fmt.usd(goal)   : fmt.pct(goal);
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", flex: "1 1 220px", minWidth: 200 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, padding: "18px 20px", flex: "1 1 220px", minWidth: 200 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <span style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase" }}>{label}</span>
-        <span style={{ background: isOnPace ? "rgba(16,185,129,.15)" : "rgba(245,158,11,.15)", color: statusCol, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 5 }}>{status}</span>
+        <span style={{ color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+        <span style={{ background: isOnPace ? "rgba(74,124,89,.1)" : "rgba(201,129,58,.1)", color: statusCol, fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 2 }}>{statusText}</span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
         <div>
-          <div style={{ color: C.text, fontSize: 20, fontWeight: 800, fontFamily: "monospace" }}>{displayActual}</div>
-          <div style={{ color: C.muted, fontSize: 11 }}>of {displayGoal} goal</div>
+          <div style={{ color: C.text, fontSize: 20, fontWeight: 700, fontFamily: "monospace" }}>{displayActual}</div>
+          <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>of {displayGoal} goal</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: statusCol, fontSize: 18, fontWeight: 800 }}>{actualPct.toFixed(0)}%</div>
+          <div style={{ color: statusCol, fontSize: 18, fontWeight: 700 }}>{actualPct.toFixed(0)}%</div>
           <div style={{ color: C.muted, fontSize: 10 }}>attained</div>
         </div>
       </div>
-      {/* Progress bar */}
-      <div style={{ background: C.border, borderRadius: 6, height: 8, position: "relative", marginBottom: 4 }}>
-        <div style={{ background: `linear-gradient(90deg, ${color}, ${color}BB)`, width: `${actualPct}%`, height: "100%", borderRadius: 6, transition: "width 0.8s ease" }} />
-        {/* Expected pace marker */}
-        <div style={{ position: "absolute", top: -4, left: `${Math.min(expectedPct, 99)}%`, width: 2, height: 16, background: C.muted, borderRadius: 1 }} />
+      <div style={{ background: C.surface2, borderRadius: 2, height: 6, position: "relative" }}>
+        <div style={{ background: color, width: `${actualPct}%`, height: "100%", borderRadius: 2 }} />
+        <div style={{ position: "absolute", top: -5, left: `${Math.min(expectedPct, 98)}%`, width: 1.5, height: 16, background: C.muted }} />
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ color: C.muted, fontSize: 9 }}>0%</span>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+        <span style={{ color: C.muted, fontSize: 9, letterSpacing: "0.05em" }}>0%</span>
         <span style={{ color: C.muted, fontSize: 9 }}>Expected: {expectedPct.toFixed(0)}%</span>
         <span style={{ color: C.muted, fontSize: 9 }}>100%</span>
       </div>
@@ -201,112 +197,106 @@ function PacingBar({ label, actual, goal, expectedPct, color, format = "usd", in
   );
 }
 
+// ── TACoS Gauge ──────────────────────────────────────────────────────────────
 function TacosGauge({ actual, goal }) {
-  const pct     = Math.min((actual / goal) * 100, 150);
-  const isGood  = actual <= goal;
-  const diff    = (actual - goal).toFixed(1);
-  const color   = actual <= goal * 0.9 ? C.green : actual <= goal ? C.amber : C.red;
-  const label   = actual <= goal * 0.9 ? "Well Below Target ✓" : actual <= goal ? "Near Target ✓" : "Above Target ⚠";
-
-  const gaugeData = [{ value: Math.min(pct, 100), fill: color }, { value: Math.max(0, 100 - Math.min(pct, 100)), fill: C.border }];
+  const pct    = Math.min((actual / goal) * 100, 150);
+  const isGood = actual <= goal;
+  const diff   = Math.abs(actual - goal).toFixed(1);
+  const color  = actual <= goal * 0.9 ? C.green : actual <= goal ? C.amber : C.red;
+  const label  = actual <= goal * 0.9 ? "Well Below Target ✓" : actual <= goal ? "Near Target ✓" : "Above Target ⚠";
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "20px", flex: "1 1 260px", minWidth: 240 }}>
-      <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>TACoS vs Goal</div>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, padding: "20px", flex: "1 1 260px", minWidth: 240 }}>
+      <div style={{ color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>TACoS vs Goal</div>
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-        {/* Semicircle gauge */}
         <div style={{ position: "relative", width: 120, height: 70 }}>
           <svg width="120" height="70" viewBox="0 0 120 70">
-            {/* Background arc */}
-            <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke={C.border} strokeWidth="12" strokeLinecap="round" />
-            {/* Colored arc */}
+            <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke={C.surface2} strokeWidth="10" strokeLinecap="round" />
             {(() => {
               const angle = Math.min(pct / 100, 1) * Math.PI;
               const x = 60 - 50 * Math.cos(angle);
               const y = 60 - 50 * Math.sin(angle);
               const largeArc = angle > Math.PI / 2 ? 1 : 0;
-              return <path d={`M 10 60 A 50 50 0 ${largeArc} 1 ${x.toFixed(1)} ${y.toFixed(1)}`} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" />;
+              return <path d={`M 10 60 A 50 50 0 ${largeArc} 1 ${x.toFixed(1)} ${y.toFixed(1)}`} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" />;
             })()}
-            {/* Goal marker */}
-            {(() => {
-              const goalAngle = Math.PI; // 100% = full arc
-              const markerAngle = Math.PI; // goal is always at 100%
-              return <circle cx="110" cy="60" r="5" fill={C.gold} />;
-            })()}
-            {/* Needle */}
+            <circle cx="110" cy="60" r="4" fill={C.gold} />
             {(() => {
               const needleAngle = Math.min(pct / 100, 1) * Math.PI;
-              const nx = 60 - 40 * Math.cos(needleAngle);
-              const ny = 60 - 40 * Math.sin(needleAngle);
-              return <line x1="60" y1="60" x2={nx.toFixed(1)} y2={ny.toFixed(1)} stroke={C.text} strokeWidth="2" strokeLinecap="round" />;
+              const nx = 60 - 38 * Math.cos(needleAngle);
+              const ny = 60 - 38 * Math.sin(needleAngle);
+              return <line x1="60" y1="60" x2={nx.toFixed(1)} y2={ny.toFixed(1)} stroke={C.charcoal} strokeWidth="2" strokeLinecap="round" />;
             })()}
-            <circle cx="60" cy="60" r="4" fill={C.text} />
+            <circle cx="60" cy="60" r="3" fill={C.charcoal} />
           </svg>
           <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", textAlign: "center" }}>
-            <div style={{ color, fontSize: 18, fontWeight: 800, fontFamily: "monospace", lineHeight: 1 }}>{fmt.pct(actual)}</div>
+            <div style={{ color, fontSize: 18, fontWeight: 700, fontFamily: "monospace" }}>{fmt.pct(actual)}</div>
           </div>
         </div>
         <div>
           <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Goal: <span style={{ color: C.gold, fontWeight: 700 }}>{fmt.pct(goal)}</span></div>
-          <div style={{ background: isGood ? "rgba(16,185,129,.15)" : "rgba(244,63,94,.15)", color, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 6, marginBottom: 6 }}>{label}</div>
-          <div style={{ color: C.muted, fontSize: 11 }}>
-            {isGood ? `${Math.abs(diff)}pp below target` : `${Math.abs(diff)}pp above target`}
-          </div>
+          <div style={{ background: isGood ? "rgba(74,124,89,.1)" : "rgba(155,58,58,.1)", color, fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 2, marginBottom: 6 }}>{label}</div>
+          <div style={{ color: C.muted, fontSize: 11 }}>{isGood ? `${diff}pp below target` : `${diff}pp above target`}</div>
         </div>
       </div>
     </div>
   );
 }
 
-function GoalVsActualBar({ data }) {
-  return (
-    <ResponsiveContainer width="100%" height={240}>
-      <BarChart data={data} barGap={4}>
-        <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-        <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmt.usd(v)} />
-        <Tooltip content={<Tip />} />
-        <Legend wrapperStyle={{ fontSize: 11, color: C.muted }} />
-        <Bar dataKey="actual" name="Actual" fill={C.cyan}   radius={[3,3,0,0]} />
-        <Bar dataKey="goal"   name="Goal"   fill={C.border} radius={[3,3,0,0]} opacity={0.7} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
+// ── Section Title ─────────────────────────────────────────────────────────────
 function SectionTitle({ children, sub }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ width: 3, height: 18, background: C.cyan, borderRadius: 2 }} />
-        <h2 style={{ color: C.text, fontSize: 15, fontWeight: 800, margin: 0, letterSpacing: "0.04em", textTransform: "uppercase" }}>{children}</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 16, height: 1, background: C.gold }} />
+        <h2 style={{ color: C.text, fontSize: 11, fontWeight: 700, margin: 0, letterSpacing: "0.14em", textTransform: "uppercase" }}>{children}</h2>
       </div>
-      {sub && <p style={{ color: C.muted, fontSize: 12, margin: "4px 0 0 11px" }}>{sub}</p>}
+      {sub && <p style={{ color: C.muted, fontSize: 11, margin: "4px 0 0 26px" }}>{sub}</p>}
     </div>
   );
 }
 
+// ── Data Table ────────────────────────────────────────────────────────────────
 function DataTable({ cols, rows }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <thead>
-          <tr>{cols.map(c => <th key={c} style={{ textAlign: "left", padding: "8px 10px", color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: `1px solid ${C.border}` }}>{c}</th>)}</tr>
+          <tr style={{ borderBottom: `2px solid ${C.gold}` }}>
+            {cols.map(c => <th key={c} style={{ textAlign: "left", padding: "8px 10px", color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{c}</th>)}
+          </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: `1px solid ${C.border}22` }}>
+            <tr key={i} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.surface : C.bg }}>
               {row.map((cell, j) => {
                 const isAcos = cols[j]?.toLowerCase().includes("acos");
-                const acosNum = parseFloat(cell);
-                const acosColor = isAcos ? (acosNum < 30 ? C.green : acosNum < 60 ? C.amber : C.red) : null;
-                return <td key={j} style={{ padding: "9px 10px", color: acosColor || (j === 0 ? C.text : C.muted), fontWeight: j === 0 ? 600 : 400, fontFamily: j > 0 ? "monospace" : "inherit", fontSize: j > 0 ? 11 : 12 }}>{cell}</td>;
+                const n = parseFloat(cell);
+                const acosColor = isAcos ? (n < 30 ? C.green : n < 60 ? C.amber : C.red) : null;
+                return (
+                  <td key={j} style={{ padding: "9px 10px", color: acosColor || (j === 0 ? C.text : C.textSub), fontWeight: j === 0 ? 600 : 400, fontFamily: j > 0 ? "monospace" : "inherit", fontSize: j > 0 ? 11 : 12 }}>{cell}</td>
+                );
               })}
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function GoalVsActualBar({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <BarChart data={data} barGap={4}>
+        <CartesianGrid strokeDasharray="2 4" stroke={C.border} />
+        <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmt.usd(v)} />
+        <Tooltip content={<Tip />} />
+        <Legend wrapperStyle={{ fontSize: 11, color: C.muted }} />
+        <Bar dataKey="actual" name="Actual" fill={C.charcoal} radius={[2,2,0,0]} />
+        <Bar dataKey="goal"   name="Goal"   fill={C.goldLight} radius={[2,2,0,0]} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -322,105 +312,118 @@ export default function App() {
   const spendByType = febCamps.map(c => ({ name: c.type, value: c.spend }));
   const salesByType = febCamps.map(c => ({ name: c.type, value: c.sales }));
 
-  // Goal vs actual chart data
   const totalSalesVsGoal = MONTHLY.map((m, i) => ({ month: m.month, actual: m.totalSales, goal: MONTHLY_GOALS[i]?.totalSalesGoal || 0 }));
   const adSalesVsGoal    = MONTHLY.map((m, i) => ({ month: m.month, actual: m.adSales,    goal: MONTHLY_GOALS[i]?.adSalesGoal   || 0 }));
   const adSpendVsGoal    = MONTHLY.map((m, i) => ({ month: m.month, actual: m.adSpend,    goal: MONTHLY_GOALS[i]?.adSpendBudget || 0 }));
   const tacosVsGoal      = MONTHLY.map((m, i) => ({ month: m.month, actual: m.tacos,      goal: MONTHLY_GOALS[i]?.tacosGoal     || 0 }));
 
+  const cardStyle = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, padding: 20 };
+
   return (
     <div style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif", background: C.bg, minHeight: "100vh", color: C.text }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Header */}
-      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, background: `linear-gradient(135deg, ${C.cyan}, ${C.violet})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>✦</div>
+      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "0 32px", display: "flex", justifyContent: "space-between", alignItems: "stretch", position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0" }}>
+          {/* MD Shield logo mark */}
+          <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
+            <path d="M14 0L0 5.5V16C0 23.7 6.1 30.8 14 32C21.9 30.8 28 23.7 28 16V5.5L14 0Z" fill={C.charcoal}/>
+            <path d="M14 4L4 8V16C4 21.8 8.4 27.1 14 28.4C19.6 27.1 24 21.8 24 16V8L14 4Z" fill={C.gold}/>
+            <text x="14" y="20" textAnchor="middle" fill={C.charcoal} fontSize="10" fontWeight="700" fontFamily="serif">MD</text>
+          </svg>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: "0.06em", textTransform: "uppercase" }}>PHLUR · Ad Performance</div>
-            <div style={{ color: C.muted, fontSize: 11 }}>Amazon US · Kapoq + Skai · as of Mar 6, 2026</div>
+            <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: C.text }}>PHLUR · Ad Performance</div>
+            <div style={{ color: C.muted, fontSize: 10, letterSpacing: "0.04em" }}>Amazon US · Kapoq + Skai · as of Mar 6, 2026</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, boxShadow: `0 0 5px ${C.green}` }} />
-          <span style={{ color: C.muted, fontSize: 11 }}>Live data</span>
+        {/* Tabs inline in header */}
+        <div style={{ display: "flex", gap: 0 }}>
+          {TABS.map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: "0 18px", background: "none", border: "none", cursor: "pointer", color: tab === t ? C.text : C.muted, fontSize: 11, fontWeight: tab === t ? 700 : 400, letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: tab === t ? `2px solid ${C.gold}` : "2px solid transparent", transition: "all .15s", marginBottom: -1 }}>{t}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green }} />
+          <span style={{ color: C.muted, fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase" }}>Live</span>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "0 24px", display: "flex", gap: 2 }}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: "11px 16px", background: "none", border: "none", cursor: "pointer", color: tab === t ? C.cyan : C.muted, fontSize: 13, fontWeight: 700, borderBottom: tab === t ? `2px solid ${C.cyan}` : "2px solid transparent", transition: "all .15s" }}>{t}</button>
-        ))}
-      </div>
-
-      <div style={{ padding: "24px", maxWidth: 1500, margin: "0 auto" }}>
+      <div style={{ padding: "28px 32px", maxWidth: 1500, margin: "0 auto" }}>
 
         {/* ── OVERVIEW ── */}
         {tab === "Overview" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             <div>
-              <SectionTitle sub="February 2026 · vs January 2026">Key Metrics</SectionTitle>
+              <SectionTitle sub="February 2026 vs January 2026">Key Metrics</SectionTitle>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                <KPI label="Total Sales"  value={fmt.usd(feb.totalSales)} change={chg(feb.totalSales, jan.totalSales)} up={true}  sub="vs Jan" color={C.cyan}   />
-                <KPI label="Ad Sales"     value={fmt.usd(feb.adSales)}    change={chg(feb.adSales, jan.adSales)}       up={true}  sub="vs Jan" color={C.green}  />
-                <KPI label="Ad Spend"     value={fmt.usd(feb.adSpend)}    change={chg(feb.adSpend, jan.adSpend)}       up={false} sub="vs Jan" color={C.orange} />
-                <KPI label="ACoS"         value={fmt.pct(feb.acos)}       change={`-${(jan.acos-feb.acos).toFixed(1)}pp`} up={true} sub="vs Jan" color={C.amber} />
-                <KPI label="TACoS"        value={fmt.pct(feb.tacos)}      change={`-${(jan.tacos-feb.tacos).toFixed(1)}pp`} up={true} sub="vs Jan" color={C.violet} />
-                <KPI label="Orders"       value={fmt.num(feb.orders)}     change={chg(feb.orders, jan.orders)}         up={true}  sub="vs Jan" color={C.cyan}   />
-                <KPI label="Impressions"  value={fmt.num(feb.impressions)} change={chg(feb.impressions, jan.impressions)} up={false} sub="vs Jan" color={C.muted} />
-                <KPI label="CPC"          value={`$${feb.cpc}`}           change={`-$${(jan.cpc-feb.cpc).toFixed(2)}`} up={true}  sub="vs Jan" color={C.green}  />
+                <KPI label="Total Sales"  value={fmt.usd(feb.totalSales)} change={chg(feb.totalSales, jan.totalSales)} up={true}  sub="vs Jan" accent={C.gold}    />
+                <KPI label="Ad Sales"     value={fmt.usd(feb.adSales)}    change={chg(feb.adSales, jan.adSales)}       up={true}  sub="vs Jan" accent={C.charcoal} />
+                <KPI label="Ad Spend"     value={fmt.usd(feb.adSpend)}    change={chg(feb.adSpend, jan.adSpend)}       up={false} sub="vs Jan" accent={C.brown}    />
+                <KPI label="ACoS"         value={fmt.pct(feb.acos)}       change={`-${(jan.acos-feb.acos).toFixed(1)}pp`} up={true} sub="vs Jan" accent={C.gold}  />
+                <KPI label="TACoS"        value={fmt.pct(feb.tacos)}      change={`-${(jan.tacos-feb.tacos).toFixed(1)}pp`} up={true} sub="vs Jan" accent={C.goldDark} />
+                <KPI label="Orders"       value={fmt.num(feb.orders)}     change={chg(feb.orders, jan.orders)}         up={true}  sub="vs Jan" accent={C.charcoal} />
+                <KPI label="Impressions"  value={fmt.num(feb.impressions)} change={chg(feb.impressions, jan.impressions)} up={false} sub="vs Jan" accent={C.taupe} />
+                <KPI label="CPC"          value={`$${feb.cpc}`}           change={`-$${(jan.cpc-feb.cpc).toFixed(2)}`} up={true}  sub="vs Jan" accent={C.green}    />
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={cardStyle}>
                 <SectionTitle sub="10 weeks · Ad Spend vs Ad Sales">Weekly Spend & Sales</SectionTitle>
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={210}>
                   <BarChart data={WEEKLY}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <CartesianGrid strokeDasharray="2 4" stroke={C.border} />
                     <XAxis dataKey="label" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmt.usd(v)} />
                     <Tooltip content={<Tip />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="adSpend" name="Ad Spend" fill={C.orange} radius={[3,3,0,0]} />
-                    <Bar dataKey="adSales" name="Ad Sales" fill={C.cyan}   radius={[3,3,0,0]} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: C.muted }} />
+                    <Bar dataKey="adSpend" name="Ad Spend" fill={C.brown}    radius={[2,2,0,0]} />
+                    <Bar dataKey="adSales" name="Ad Sales" fill={C.charcoal} radius={[2,2,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={cardStyle}>
                 <SectionTitle sub="10 weeks · ACoS % and TACoS %">ACoS & TACoS Trend</SectionTitle>
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={210}>
                   <LineChart data={WEEKLY}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <CartesianGrid strokeDasharray="2 4" stroke={C.border} />
                     <XAxis dataKey="label" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
                     <Tooltip content={<Tip />} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Line type="monotone" dataKey="acos"  name="ACoS %"  stroke={C.amber} strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="tacos" name="TACoS %" stroke={C.green} strokeWidth={2} dot={{ r: 3 }} strokeDasharray="5 3" />
+                    <Line type="monotone" dataKey="acos"  name="ACoS %"  stroke={C.charcoal} strokeWidth={2} dot={{ r: 3, fill: C.charcoal }} />
+                    <Line type="monotone" dataKey="tacos" name="TACoS %" stroke={C.gold}     strokeWidth={2} dot={{ r: 3, fill: C.gold }} strokeDasharray="5 3" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-              <SectionTitle sub="Weekly Ad Sales vs Total Sales — gap = organic revenue">Ad Sales vs Total Revenue</SectionTitle>
-              <ResponsiveContainer width="100%" height={200}>
+            <div style={cardStyle}>
+              <SectionTitle sub="Weekly Ad Sales vs Total Sales — gap represents organic revenue">Ad Sales vs Total Revenue</SectionTitle>
+              <ResponsiveContainer width="100%" height={190}>
                 <AreaChart data={WEEKLY}>
                   <defs>
-                    <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.green} stopOpacity={0.25}/><stop offset="95%" stopColor={C.green} stopOpacity={0}/></linearGradient>
-                    <linearGradient id="gAd"    x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.cyan}  stopOpacity={0.25}/><stop offset="95%" stopColor={C.cyan}  stopOpacity={0}/></linearGradient>
+                    <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.charcoal} stopOpacity={0.12}/><stop offset="95%" stopColor={C.charcoal} stopOpacity={0}/></linearGradient>
+                    <linearGradient id="gAd"    x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.gold}     stopOpacity={0.18}/><stop offset="95%" stopColor={C.gold}     stopOpacity={0}/></linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                  <CartesianGrid strokeDasharray="2 4" stroke={C.border} />
                   <XAxis dataKey="label" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => fmt.usd(v)} />
                   <Tooltip content={<Tip />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Area type="monotone" dataKey="totalSales" name="Total Sales" stroke={C.green} fill="url(#gTotal)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="adSales"    name="Ad Sales"   stroke={C.cyan}  fill="url(#gAd)"    strokeWidth={2} />
+                  <Area type="monotone" dataKey="totalSales" name="Total Sales" stroke={C.charcoal} fill="url(#gTotal)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="adSales"    name="Ad Sales"   stroke={C.gold}     fill="url(#gAd)"    strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+
+            <div style={cardStyle}>
+              <SectionTitle sub="Jan–Mar 2026 · Source: Kapoq">Monthly Summary</SectionTitle>
+              <DataTable
+                cols={["Month","Total Sales","Ad Sales","Ad Spend","Orders","ACoS","TACoS","CTR","CPC"]}
+                rows={MONTHLY.map(m => [m.month, fmt.usd(m.totalSales), fmt.usd(m.adSales), fmt.usd(m.adSpend), fmt.num(m.orders), fmt.pct(m.acos), fmt.pct(m.tacos), `${m.ctr}%`, `$${m.cpc}`])}
+              />
             </div>
           </div>
         )}
@@ -428,112 +431,82 @@ export default function App() {
         {/* ── GOALS & PACING ── */}
         {tab === "Goals & Pacing" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
-            {/* Annual YTD pacing */}
             <div>
-              <SectionTitle sub={`YTD through Mar 6 · ${DAYS_ELAPSED} of ${DAYS_IN_YEAR} days elapsed (${YEAR_PCT.toFixed(0)}% of year)`}>Annual Goals — YTD Pacing</SectionTitle>
+              <SectionTitle sub={`YTD through Mar 6 · ${DAYS_ELAPSED} of ${DAYS_IN_YEAR} days (${YEAR_PCT.toFixed(0)}% of year elapsed)`}>Annual Goals — YTD Pacing</SectionTitle>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                <PacingBar label="Annual Total Sales"  actual={YTD.totalSales} goal={ANNUAL_GOALS.totalSales} expectedPct={YEAR_PCT} color={C.cyan}   />
-                <PacingBar label="Annual Ad Sales"     actual={YTD.adSales}    goal={ANNUAL_GOALS.adSales}    expectedPct={YEAR_PCT} color={C.green}  />
-                <PacingBar label="Annual Ad Spend"     actual={YTD.adSpend}    goal={ANNUAL_GOALS.adSpend}    expectedPct={YEAR_PCT} color={C.orange} />
-                <PacingBar label="Annual Orders"       actual={YTD.orders}     goal={ANNUAL_GOALS.orders}     expectedPct={YEAR_PCT} color={C.violet} format="num" />
+                <PacingBar label="Annual Total Sales"  actual={YTD.totalSales} goal={ANNUAL_GOALS.totalSales} expectedPct={YEAR_PCT} color={C.charcoal} />
+                <PacingBar label="Annual Ad Sales"     actual={YTD.adSales}    goal={ANNUAL_GOALS.adSales}    expectedPct={YEAR_PCT} color={C.gold}     />
+                <PacingBar label="Annual Ad Spend"     actual={YTD.adSpend}    goal={ANNUAL_GOALS.adSpend}    expectedPct={YEAR_PCT} color={C.brown}    />
+                <PacingBar label="Annual Orders"       actual={YTD.orders}     goal={ANNUAL_GOALS.orders}     expectedPct={YEAR_PCT} color={C.taupe}    format="num" />
               </div>
             </div>
 
-            {/* TACoS gauge + monthly TACoS */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "stretch" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               <TacosGauge actual={YTD.tacos} goal={ANNUAL_GOALS.tacosGoal} />
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", flex: "1 1 220px" }}>
-                <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>TACoS vs Goal by Month</div>
+              <div style={{ ...cardStyle, flex: "1 1 220px" }}>
+                <SectionTitle sub="Monthly actual vs goal">TACoS vs Goal by Month</SectionTitle>
                 <ResponsiveContainer width="100%" height={130}>
                   <BarChart data={tacosVsGoal} barGap={4}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <CartesianGrid strokeDasharray="2 4" stroke={C.border} />
                     <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 30]} />
                     <Tooltip />
-                    <Bar dataKey="actual" name="Actual TACoS %" fill={C.cyan}   radius={[3,3,0,0]} />
-                    <Bar dataKey="goal"   name="TACoS Goal %"  fill={C.gold}   radius={[3,3,0,0]} opacity={0.5} />
+                    <Bar dataKey="actual" name="Actual TACoS %" fill={C.charcoal} radius={[2,2,0,0]} />
+                    <Bar dataKey="goal"   name="TACoS Goal %"  fill={C.goldLight} radius={[2,2,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 18px", flex: "1 1 200px" }}>
-                <div style={{ color: C.muted, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Annual Goal Summary</div>
-                {[
-                  ["Total Sales Goal", fmt.usd(ANNUAL_GOALS.totalSales)],
-                  ["Ad Sales Goal",    fmt.usd(ANNUAL_GOALS.adSales)],
-                  ["Ad Spend Budget",  fmt.usd(ANNUAL_GOALS.adSpend)],
-                  ["Orders Goal",      fmt.num(ANNUAL_GOALS.orders)],
-                  ["TACoS Goal",       fmt.pct(ANNUAL_GOALS.tacosGoal)],
-                  ["ACoS Goal",        fmt.pct(ANNUAL_GOALS.acosGoal)],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}22` }}>
+              <div style={{ ...cardStyle, flex: "1 1 200px" }}>
+                <SectionTitle sub="From Phlur_Goals_2026.xlsx">Annual Goal Summary</SectionTitle>
+                {[["Total Sales Goal", fmt.usd(ANNUAL_GOALS.totalSales)], ["Ad Sales Goal", fmt.usd(ANNUAL_GOALS.adSales)], ["Ad Spend Budget", fmt.usd(ANNUAL_GOALS.adSpend)], ["Orders Goal", fmt.num(ANNUAL_GOALS.orders)], ["TACoS Goal", fmt.pct(ANNUAL_GOALS.tacosGoal)], ["ACoS Goal", fmt.pct(ANNUAL_GOALS.acosGoal)]].map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${C.border}` }}>
                     <span style={{ color: C.muted, fontSize: 12 }}>{k}</span>
-                    <span style={{ color: C.text, fontFamily: "monospace", fontSize: 12, fontWeight: 700 }}>{v}</span>
+                    <span style={{ color: C.text, fontFamily: "monospace", fontSize: 12, fontWeight: 600 }}>{v}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* March MTD pacing */}
             <div>
-              <SectionTitle sub={`March MTD · Day ${MAR_DAY} of ${MAR_DAYS} · ${MAR_PCT.toFixed(0)}% through month`}>March MTD Pacing vs Monthly Goals</SectionTitle>
+              <SectionTitle sub={`March MTD · Day ${MAR_DAY} of ${MAR_DAYS} · ${MAR_PCT.toFixed(0)}% through month`}>March MTD Pacing</SectionTitle>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                <PacingBar label="Mar Total Sales"  actual={MAR_ACTUALS.totalSales} goal={MAR_GOALS.totalSalesGoal} expectedPct={MAR_PCT} color={C.cyan}   />
-                <PacingBar label="Mar Ad Sales"     actual={MAR_ACTUALS.adSales}    goal={MAR_GOALS.adSalesGoal}    expectedPct={MAR_PCT} color={C.green}  />
-                <PacingBar label="Mar Ad Spend"     actual={MAR_ACTUALS.adSpend}    goal={MAR_GOALS.adSpendBudget}  expectedPct={MAR_PCT} color={C.orange} />
-                <PacingBar label="Mar Orders"       actual={MAR_ACTUALS.orders}     goal={MAR_GOALS.ordersGoal}     expectedPct={MAR_PCT} color={C.violet} format="num" />
+                <PacingBar label="Mar Total Sales"  actual={MONTHLY[2].totalSales} goal={MONTHLY_GOALS[2].totalSalesGoal} expectedPct={MAR_PCT} color={C.charcoal} />
+                <PacingBar label="Mar Ad Sales"     actual={MONTHLY[2].adSales}    goal={MONTHLY_GOALS[2].adSalesGoal}    expectedPct={MAR_PCT} color={C.gold}     />
+                <PacingBar label="Mar Ad Spend"     actual={MONTHLY[2].adSpend}    goal={MONTHLY_GOALS[2].adSpendBudget}  expectedPct={MAR_PCT} color={C.brown}    />
+                <PacingBar label="Mar Orders"       actual={MONTHLY[2].orders}     goal={MONTHLY_GOALS[2].ordersGoal}     expectedPct={MAR_PCT} color={C.taupe}    format="num" />
               </div>
             </div>
 
-            {/* Goal vs actual charts */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-                <SectionTitle sub="Monthly actual vs goal">Total Sales vs Goal</SectionTitle>
-                <GoalVsActualBar data={totalSalesVsGoal} />
-              </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-                <SectionTitle sub="Monthly actual vs goal">Ad Sales vs Goal</SectionTitle>
-                <GoalVsActualBar data={adSalesVsGoal} />
-              </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-                <SectionTitle sub="Monthly actual vs budget">Ad Spend vs Budget</SectionTitle>
-                <GoalVsActualBar data={adSpendVsGoal} />
-              </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-                <SectionTitle sub="Monthly TACoS actual vs goal — lower is better">TACoS vs Goal</SectionTitle>
-                <ResponsiveContainer width="100%" height={240}>
+              <div style={cardStyle}><SectionTitle sub="Monthly actual vs goal">Total Sales vs Goal</SectionTitle><GoalVsActualBar data={totalSalesVsGoal} /></div>
+              <div style={cardStyle}><SectionTitle sub="Monthly actual vs goal">Ad Sales vs Goal</SectionTitle><GoalVsActualBar data={adSalesVsGoal} /></div>
+              <div style={cardStyle}><SectionTitle sub="Monthly actual vs budget">Ad Spend vs Budget</SectionTitle><GoalVsActualBar data={adSpendVsGoal} /></div>
+              <div style={cardStyle}>
+                <SectionTitle sub="Lower is better">TACoS vs Goal Trend</SectionTitle>
+                <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={tacosVsGoal}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                    <CartesianGrid strokeDasharray="2 4" stroke={C.border} />
                     <XAxis dataKey="month" tick={{ fill: C.muted, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: C.muted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} domain={[0, 30]} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Line type="monotone" dataKey="actual" name="Actual TACoS %" stroke={C.cyan}  strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="goal"   name="TACoS Goal %"  stroke={C.gold}  strokeWidth={2} dot={{ r: 4 }} strokeDasharray="6 3" />
+                    <Line type="monotone" dataKey="actual" name="Actual TACoS %" stroke={C.charcoal} strokeWidth={2} dot={{ r: 4, fill: C.charcoal }} />
+                    <Line type="monotone" dataKey="goal"   name="TACoS Goal %"  stroke={C.gold}     strokeWidth={2} dot={{ r: 4, fill: C.gold }} strokeDasharray="6 3" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Monthly goals table */}
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-              <SectionTitle sub="From Phlur_Goals_2026.xlsx · update monthly">Monthly Goals vs Actuals</SectionTitle>
+            <div style={cardStyle}>
+              <SectionTitle sub="From Phlur_Goals_2026.xlsx">Monthly Goals vs Actuals</SectionTitle>
               <DataTable
-                cols={["Month", "Total Sales", "Goal", "vs Goal", "Ad Spend", "Budget", "vs Budget", "TACoS", "TACoS Goal", "vs Goal"]}
+                cols={["Month","Total Sales","Goal","vs Goal","Ad Spend","Budget","vs Budget","TACoS","TACoS Goal","vs Goal"]}
                 rows={MONTHLY.map((m, i) => {
                   const g = MONTHLY_GOALS[i];
-                  const salesDiff = (((m.totalSales - g.totalSalesGoal) / g.totalSalesGoal) * 100).toFixed(1);
-                  const spendDiff = (((m.adSpend - g.adSpendBudget) / g.adSpendBudget) * 100).toFixed(1);
+                  const salesDiff = (((m.totalSales-g.totalSalesGoal)/g.totalSalesGoal)*100).toFixed(1);
+                  const spendDiff = (((m.adSpend-g.adSpendBudget)/g.adSpendBudget)*100).toFixed(1);
                   const tacosDiff = (m.tacos - g.tacosGoal).toFixed(1);
-                  return [
-                    m.month,
-                    fmt.usd(m.totalSales), fmt.usd(g.totalSalesGoal),
-                    `${salesDiff > 0 ? "+" : ""}${salesDiff}%`,
-                    fmt.usd(m.adSpend), fmt.usd(g.adSpendBudget),
-                    `${spendDiff > 0 ? "+" : ""}${spendDiff}%`,
-                    fmt.pct(m.tacos), fmt.pct(g.tacosGoal),
-                    `${tacosDiff > 0 ? "+" : ""}${tacosDiff}pp`,
-                  ];
+                  return [m.month, fmt.usd(m.totalSales), fmt.usd(g.totalSalesGoal), `${salesDiff>0?"+":""}${salesDiff}%`, fmt.usd(m.adSpend), fmt.usd(g.adSpendBudget), `${spendDiff>0?"+":""}${spendDiff}%`, fmt.pct(m.tacos), fmt.pct(g.tacosGoal), `${tacosDiff>0?"+":""}${tacosDiff}pp`];
                 })}
               />
             </div>
@@ -543,38 +516,40 @@ export default function App() {
         {/* ── PPC CAMPAIGNS ── */}
         {tab === "PPC Campaigns" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            <SectionTitle sub="Sponsored Products · Sponsored Brands · Sponsored Display">PPC by Campaign Type</SectionTitle>
+            <SectionTitle sub="Sponsored Products · Sponsored Brands · Sponsored Display · February 2026">PPC by Campaign Type</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-              {febCamps.map(c => (
-                <div key={c.type} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+              {febCamps.map((c, idx) => (
+                <div key={c.type} style={{ ...cardStyle, borderTop: `3px solid ${idx===0?C.charcoal:idx===1?C.gold:C.brown}` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <span style={{ fontFamily: "monospace", fontSize: 22, fontWeight: 800, color: C.cyan }}>{c.type}</span>
-                    <span style={{ background: "rgba(0,194,255,.1)", color: C.cyan, fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 5 }}>Sponsored {c.type==="SP"?"Products":c.type==="SB"?"Brands":"Display"}</span>
+                    <span style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 700, color: C.text }}>{c.type}</span>
+                    <span style={{ background: C.surface2, color: C.muted, fontSize: 10, fontWeight: 600, padding: "3px 10px", borderRadius: 2, letterSpacing: "0.06em" }}>
+                      Sponsored {c.type==="SP"?"Products":c.type==="SB"?"Brands":"Display"}
+                    </span>
                   </div>
                   {[["Ad Spend",fmt.usd(c.spend)],["Ad Sales",fmt.usd(c.sales)],["Orders",fmt.num(c.orders)],["ACoS",fmt.pct(c.acos)],["ROAS",fmt.x(c.roas)],["Impressions",fmt.num(c.impressions)]].map(([k,v]) => {
                     const isAcos = k==="ACoS"; const n = parseFloat(c.acos);
                     const col = isAcos ? (n<35?C.green:n<70?C.amber:C.red) : C.text;
-                    return <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${C.border}22` }}><span style={{color:C.muted,fontSize:12}}>{k}</span><span style={{color:col,fontFamily:"monospace",fontSize:12,fontWeight:700}}>{v}</span></div>;
+                    return <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}><span style={{color:C.muted,fontSize:12}}>{k}</span><span style={{color:col,fontFamily:"monospace",fontSize:12,fontWeight:600}}>{v}</span></div>;
                   })}
                 </div>
               ))}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-                <SectionTitle sub="Feb 2026">% Spend by Type</SectionTitle>
+              <div style={cardStyle}>
+                <SectionTitle sub="Feb 2026 Spend Mix">% Spend by Type</SectionTitle>
                 <ResponsiveContainer width="100%" height={200}>
-                  <PieChart><Pie data={spendByType} cx="50%" cy="50%" outerRadius={78} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>{spendByType.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}</Pie><Tooltip formatter={v=>fmt.usd(v)} contentStyle={{background:C.surface2,border:`1px solid ${C.border}`}}/></PieChart>
+                  <PieChart><Pie data={spendByType} cx="50%" cy="50%" outerRadius={75} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false} style={{fontSize:12}}>{spendByType.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}</Pie><Tooltip formatter={v=>fmt.usd(v)} contentStyle={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:2}}/></PieChart>
                 </ResponsiveContainer>
               </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-                <SectionTitle sub="Feb 2026">% Sales by Type</SectionTitle>
+              <div style={cardStyle}>
+                <SectionTitle sub="Feb 2026 Sales Mix">% Sales by Type</SectionTitle>
                 <ResponsiveContainer width="100%" height={200}>
-                  <PieChart><Pie data={salesByType} cx="50%" cy="50%" outerRadius={78} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>{salesByType.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}</Pie><Tooltip formatter={v=>fmt.usd(v)} contentStyle={{background:C.surface2,border:`1px solid ${C.border}`}}/></PieChart>
+                  <PieChart><Pie data={salesByType} cx="50%" cy="50%" outerRadius={75} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false} style={{fontSize:12}}>{salesByType.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}</Pie><Tooltip formatter={v=>fmt.usd(v)} contentStyle={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:2}}/></PieChart>
                 </ResponsiveContainer>
               </div>
             </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-              <SectionTitle sub="Jan–Mar 2026">Campaign Type Detail</SectionTitle>
+            <div style={cardStyle}>
+              <SectionTitle sub="Jan–Mar 2026 all campaign types">Campaign Type Detail</SectionTitle>
               <DataTable cols={["Month","Type","Ad Spend","Ad Sales","Orders","Impressions","Clicks","ACoS","ROAS"]}
                 rows={CAMPAIGNS.map(c=>[c.month,c.type,fmt.usd(c.spend),fmt.usd(c.sales),fmt.num(c.orders),fmt.num(c.impressions),fmt.num(c.clicks),fmt.pct(c.acos),fmt.x(c.roas)])} />
             </div>
@@ -585,26 +560,26 @@ export default function App() {
         {tab === "Keywords" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             <SectionTitle sub="Kapoq keyword data (Jan–Mar 2026) + Skai search query report (Feb–Mar 2026)">Keyword & Search Query Performance</SectionTitle>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+            <div style={cardStyle}>
               <SectionTitle sub="Top 10 keywords by total spend">Spend vs Sales by Keyword</SectionTitle>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={KEYWORDS} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} horizontal={false} />
+                  <CartesianGrid strokeDasharray="2 4" stroke={C.border} horizontal={false} />
                   <XAxis type="number" tick={{fill:C.muted,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>fmt.usd(v)} />
                   <YAxis type="category" dataKey="keyword" tick={{fill:C.text,fontSize:11}} axisLine={false} tickLine={false} width={130} />
                   <Tooltip content={<Tip />} /><Legend wrapperStyle={{fontSize:11}} />
-                  <Bar dataKey="spend" name="Spend" fill={C.orange} radius={[0,3,3,0]} />
-                  <Bar dataKey="sales" name="Sales" fill={C.cyan}   radius={[0,3,3,0]} />
+                  <Bar dataKey="spend" name="Spend" fill={C.brown}    radius={[0,2,2,0]} />
+                  <Bar dataKey="sales" name="Sales" fill={C.charcoal} radius={[0,2,2,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={cardStyle}>
                 <SectionTitle sub="Kapoq · Jan–Mar 2026">Top Keywords by Spend</SectionTitle>
                 <DataTable cols={["Keyword","Type","Spend","Sales","ACoS","CVR"]}
                   rows={KEYWORDS.map(k=>[k.keyword,k.type,fmt.usd(k.spend),fmt.usd(k.sales),fmt.pct(k.acos),`${k.cvr}%`])} />
               </div>
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+              <div style={cardStyle}>
                 <SectionTitle sub="Skai · Feb–Mar 2026">Top Search Queries</SectionTitle>
                 <DataTable cols={["Query","Spend","Sales","Conv.","ACoS"]}
                   rows={SKAI_QUERIES.map(q=>[q.query,fmt.usd(q.spend),fmt.usd(q.sales),fmt.num(q.conversions),fmt.pct(q.acos)])} />
@@ -617,19 +592,21 @@ export default function App() {
         {tab === "Products" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             <SectionTitle sub="February 2026 · Kapoq Brand Manager">Top Products by Revenue</SectionTitle>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+            <div style={cardStyle}>
               <SectionTitle sub="Feb 2026 ordered product sales">Revenue by SKU</SectionTitle>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={SKUS} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} horizontal={false} />
+                  <CartesianGrid strokeDasharray="2 4" stroke={C.border} horizontal={false} />
                   <XAxis type="number" tick={{fill:C.muted,fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>fmt.usd(v)} />
                   <YAxis type="category" dataKey="title" tick={{fill:C.text,fontSize:10}} axisLine={false} tickLine={false} width={220} />
                   <Tooltip content={<Tip />} />
-                  <Bar dataKey="sales" name="Sales" radius={[0,3,3,0]}>{SKUS.map((_,i)=><Cell key={i} fill={i===0?C.cyan:i===1?C.green:C.violet}/>)}</Bar>
+                  <Bar dataKey="sales" name="Sales" radius={[0,2,2,0]}>
+                    {SKUS.map((_,i)=><Cell key={i} fill={i===0?C.charcoal:i===1?C.gold:C.brown}/>)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+            <div style={cardStyle}>
               <SectionTitle sub="Feb 2026 · Top 10 SKUs">SKU Performance Detail</SectionTitle>
               <DataTable cols={["Product","Sales","Units","Page Views","CVR"]}
                 rows={SKUS.map(s=>[s.title,fmt.usd(s.sales),fmt.num(s.units),fmt.num(s.pageViews),`${s.cvr}%`])} />
@@ -638,9 +615,10 @@ export default function App() {
         )}
       </div>
 
-      <div style={{ borderTop: `1px solid ${C.border}`, padding: "14px 24px", display: "flex", justifyContent: "space-between" }}>
-        <span style={{ color: C.muted, fontSize: 11 }}>Sources: Kapoq · Skai · Amazon US &nbsp;|&nbsp; Goals: Phlur_Goals_2026.xlsx</span>
-        <span style={{ color: C.muted, fontSize: 11, fontFamily: "monospace" }}>PHLUR · Ad Intelligence v2.0</span>
+      {/* Footer */}
+      <div style={{ borderTop: `1px solid ${C.border}`, padding: "14px 32px", display: "flex", justifyContent: "space-between", background: C.surface }}>
+        <span style={{ color: C.muted, fontSize: 10, letterSpacing: "0.06em" }}>SOURCES: KAPOQ · SKAI · AMAZON US &nbsp;|&nbsp; GOALS: PHLUR_GOALS_2026.XLSX</span>
+        <span style={{ color: C.muted, fontSize: 10, letterSpacing: "0.06em", fontFamily: "monospace" }}>MARKET DEFENSE · PHLUR AD INTELLIGENCE V2.1</span>
       </div>
     </div>
   );
